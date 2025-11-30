@@ -58,12 +58,18 @@ Current focus areas:
 
 async def call_model(state: State, runtime: Runtime[Context]) -> dict[str, list[BaseMessage]]:
     """Process user input and generate talent demand analysis."""
+    import os
 
     # Get model from context or use default
-    model_name = (runtime.context or {}).get("model", "claude-3-5-sonnet-20241022")
+    # Using Claude Opus 4.5 - the most capable model for complex analysis
+    model_name = (runtime.context or {}).get("model", "claude-opus-4-5-20251101")
 
-    # Initialize the model
-    model = ChatAnthropic(model=model_name, temperature=0.7)
+    # Initialize the model with explicit API key from environment
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY environment variable not set")
+
+    model = ChatAnthropic(model=model_name, temperature=0.7, api_key=api_key)
 
     # Prepare messages with system prompt
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
