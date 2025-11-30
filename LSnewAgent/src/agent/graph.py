@@ -1,54 +1,83 @@
-"""LangGraph single-node graph template.
+"""Talent Demand Analyst Agent
 
-Returns a predefined response. Replace logic and configuration as needed.
+Analyzes talent demand trends, workforce planning, skills requirements, and labor market insights.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
-from langgraph.graph import StateGraph
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langgraph.graph import StateGraph, MessagesState
 from langgraph.runtime import Runtime
 from typing_extensions import TypedDict
 
 
-class Context(TypedDict):
+class Context(TypedDict, total=False):
     """Context parameters for the agent.
 
     Set these when creating assistants OR when invoking the graph.
-    See: https://langchain-ai.github.io/langgraph/cloud/how-tos/configuration_cloud/
     """
 
-    my_configurable_param: str
+    model: str
+    """The model to use for the agent. Default: claude-3-5-sonnet-20241022"""
 
 
 @dataclass
-class State:
-    """Input state for the agent.
+class State(MessagesState):
+    """Input state for the Talent Demand Analyst agent."""
 
-    Defines the initial structure of incoming data.
-    See: https://langchain-ai.github.io/langgraph/concepts/low_level/#state
-    """
-
-    changeme: str = "example"
+    pass
 
 
-async def call_model(state: State, runtime: Runtime[Context]) -> Dict[str, Any]:
-    """Process input and returns output.
+SYSTEM_PROMPT = """You are a Talent Demand Analyst, an expert in analyzing talent demand trends, workforce planning, skills requirements, and labor market insights.
 
-    Can use runtime context to alter behavior.
-    """
-    return {
-        "changeme": "output from call_model. "
-        f"Configured with {(runtime.context or {}).get('my_configurable_param')}"
-    }
+Your capabilities include:
+- Analyzing talent demand trends across industries and job roles
+- Identifying emerging skills and competencies in the labor market
+- Providing workforce planning insights and recommendations
+- Assessing skills gaps and talent shortages
+- Analyzing labor market data and employment trends
+
+When responding:
+1. Be concise and data-driven in your analysis
+2. Provide actionable insights and recommendations
+3. Cite specific trends, skills, or market dynamics when possible
+4. If you need more information to provide accurate analysis, ask clarifying questions
+5. Structure your responses clearly with bullet points or sections when appropriate
+
+Current focus areas:
+- Software engineering and technology roles
+- AI/ML and data science positions
+- Healthcare workforce
+- Financial services talent
+- Manufacturing and industrial roles"""
+
+
+async def call_model(state: State, runtime: Runtime[Context]) -> dict[str, list[BaseMessage]]:
+    """Process user input and generate talent demand analysis."""
+
+    # Get model from context or use default
+    model_name = (runtime.context or {}).get("model", "claude-3-5-sonnet-20241022")
+
+    # Initialize the model
+    model = ChatAnthropic(model=model_name, temperature=0.7)
+
+    # Prepare messages with system prompt
+    messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
+
+    # Generate response
+    response = await model.ainvoke(messages)
+
+    return {"messages": [response]}
 
 
 # Define the graph
 graph = (
     StateGraph(State, context_schema=Context)
-    .add_node(call_model)
+    .add_node("call_model", call_model)
     .add_edge("__start__", "call_model")
-    .compile(name="New Graph")
+    .compile(name="Talent Demand Analyst")
 )
